@@ -1,0 +1,264 @@
+/* ─── POS Login Page Styles ─────────────────────────────────────────────── */
+
+.pos-login-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #060b18;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Animated ambient orbs ─────────────────────────────────── */
+.pos-login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: pos-orb-pulse 8s ease-in-out infinite alternate;
+}
+.pos-login-orb--1 {
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, rgba(37,99,235,0.25), transparent 70%);
+  top: -120px; left: -100px;
+  animation-delay: 0s;
+}
+.pos-login-orb--2 {
+  width: 340px; height: 340px;
+  background: radial-gradient(circle, rgba(234,179,8,0.15), transparent 70%);
+  bottom: -80px; right: -60px;
+  animation-delay: -3s;
+}
+.pos-login-orb--3 {
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(168,85,247,0.12), transparent 70%);
+  top: 50%; left: 55%;
+  animation-delay: -6s;
+}
+@keyframes pos-orb-pulse {
+  0%   { opacity: 0.5; transform: scale(1); }
+  100% { opacity: 1;   transform: scale(1.15); }
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.pos-login-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 420px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(79, 142, 247, 0.2);
+  border-radius: 1.25rem;
+  padding: 2.5rem 2.25rem;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 20px 60px rgba(0,0,0,0.7),
+    0 0 80px rgba(37,99,235,0.08);
+  backdrop-filter: blur(20px);
+}
+
+/* ── Brand ──────────────────────────────────────────────────── */
+.pos-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.pos-login-logo {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+}
+
+.pos-login-brand-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.pos-login-brand-tagline {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 2px 0 0;
+  font-weight: 500;
+}
+
+/* ── Divider ────────────────────────────────────────────────── */
+.pos-login-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(79,142,247,0.3), transparent);
+  margin-bottom: 1.75rem;
+}
+
+/* ── Heading ────────────────────────────────────────────────── */
+.pos-login-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0 0 0.35rem;
+}
+
+.pos-login-subheading {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 1.5rem;
+}
+
+/* ── Error alert ────────────────────────────────────────────── */
+.pos-login-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.82rem;
+  color: #fca5a5;
+}
+
+/* ── Field ──────────────────────────────────────────────────── */
+.pos-login-field {
+  margin-bottom: 1.1rem;
+}
+
+.pos-login-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  margin-bottom: 0.45rem;
+}
+
+.pos-login-input-wrap {
+  position: relative;
+}
+
+.pos-login-input-icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #475569;
+  display: flex;
+  pointer-events: none;
+}
+
+.pos-login-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(71, 85, 105, 0.6);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.9rem 0.7rem 2.5rem;
+  font-size: 0.9rem;
+  color: #f1f5f9;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+}
+
+.pos-login-input--with-action {
+  padding-right: 2.75rem;
+}
+
+.pos-login-input::placeholder { color: #475569; }
+.pos-login-input:focus {
+  border-color: rgba(79, 142, 247, 0.7);
+  box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.12);
+}
+.pos-login-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Password toggle ────────────────────────────────────────── */
+.pos-login-input-action {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  border-radius: 0.3rem;
+  transition: color 0.15s;
+}
+.pos-login-input-action:hover { color: #94a3b8; }
+
+/* ── Submit button ──────────────────────────────────────────── */
+.pos-login-btn {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #4f46e5 100%);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 0.65rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: filter 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(37,99,235,0.35);
+  letter-spacing: 0.2px;
+  font-family: inherit;
+}
+.pos-login-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(37,99,235,0.5);
+}
+.pos-login-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.pos-login-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pos-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes pos-spin { to { transform: rotate(360deg); } }
+
+/* ── Counter badge ──────────────────────────────────────────── */
+.pos-login-counter-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 0.55rem 0.85rem;
+  background: rgba(234,179,8,0.08);
+  border: 1px solid rgba(234,179,8,0.2);
+  border-radius: 0.5rem;
+  font-size: 0.775rem;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.pos-login-footer {
+  text-align: center;
+  font-size: 0.72rem;
+  color: #334155;
+  margin-top: 1.75rem;
+}
