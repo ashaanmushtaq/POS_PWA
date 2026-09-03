@@ -134,9 +134,11 @@ export async function createPosCustomer(payload: {
   return {
     id: data.id,
     name: data.name,
-    company_name: data.company_name,
-    phone: data.phone,
-    city: data.city,
+    company_name: data.company_name ?? null,
+    shop_name: data.shop_name ?? null,
+    phone: data.phone ?? null,
+    address: data.address ?? null,
+    city: data.city ?? null,
     current_balance_due: 0,
   };
 }

@@ -418,9 +418,149 @@
   cursor: not-allowed;
 }
 
+/* ── Mobile Hamburger & Navigation Switcher ── */
+.pos-mobile-menu-toggle {
+  display: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.pos-mobile-tabs {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .pos-workspace { flex-direction: column; overflow-y: auto; }
   .pos-catalog-panel, .pos-cart-panel { flex: none; width: 100%; }
+}
+
+@media (max-width: 768px) {
+  .pos-mobile-menu-toggle {
+    display: flex;
+  }
+
+  .pos-bar {
+    position: relative;
+  }
+
+  .pos-bar-meta {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    z-index: 100;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+  }
+
+  .pos-bar-meta--open {
+    display: flex;
+  }
+
+  .pos-mobile-tabs {
+    display: flex;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.4rem;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .pos-mobile-tab {
+    flex: 1;
+    padding: 0.65rem 0.5rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.825rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .pos-mobile-tab--active {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  }
+
+  .pos-panel--mobile-hide {
+    display: none !important;
+  }
+
+  .pos-panel--mobile-show {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 !important;
+  }
+
+  .pos-catalog-panel, .pos-cart-panel {
+    border-right: none;
+    padding: 0.85rem;
+  }
+
+  .pos-search {
+    width: 100%;
+  }
+
+  .pos-catalog-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .pos-catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 0.65rem;
+  }
+
+  .pos-product-card {
+    padding: 0.85rem;
+  }
+
+  .pos-product-name {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .pos-product-price {
+    font-size: 1rem;
+  }
+
+  .pos-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pos-total-amount {
+    font-size: 1.15rem;
+  }
+
+  .pos-cart-table {
+    font-size: 0.78rem;
+  }
+
+  .pos-qty-input { width: 45px; }
+  .pos-price-input { width: 70px; }
 }
 
 /* Modal Shell */

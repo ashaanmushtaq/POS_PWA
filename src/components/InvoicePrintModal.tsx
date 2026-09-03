@@ -39,13 +39,17 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
   }
 
   async function domToPngBlob(node: HTMLElement): Promise<Blob> {
-    // Use html2canvas for robust DOM -> canvas rendering
-    const canvas = await html2canvas(node as HTMLElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    } catch (err) {
+      console.warn('html2canvas scale 2 failed, retrying scale 1:', err);
+      canvas = await html2canvas(node, { scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    }
     return await new Promise<Blob>((res, rej) => canvas.toBlob((b: Blob | null) => { if (b) res(b); else rej(new Error('Failed to create blob')); }, 'image/png'));
   }
 
   async function generateImageBlob(node: HTMLElement): Promise<Blob> {
-    // Ensure the node is visible and has size
     if (node.offsetParent === null && node.clientHeight === 0 && node.clientWidth === 0) {
       throw new Error('Invoice element not visible for rendering');
     }
@@ -53,23 +57,25 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
   }
 
   async function generatePdfBlob(node: HTMLElement): Promise<Blob> {
-    // Render to canvas via html2canvas then add to jsPDF
-    const canvas = await html2canvas(node as HTMLElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    } catch (err) {
+      console.warn('html2canvas scale 2 failed for PDF, retrying scale 1:', err);
+      canvas = await html2canvas(node, { scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    }
     const imgData = canvas.toDataURL('image/png');
 
-    // A4 dimensions in pt (1pt = 1/72 inch). Use jsPDF units pts
     const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // Calculate image dimensions to fit width with aspect ratio
-    const imgWidth = pageWidth - 40; // margins
+    const imgWidth = pageWidth - 40;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
     let top = 20;
     pdf.addImage(imgData, 'PNG', 20, top, imgWidth, imgHeight);
 
-    // If content taller than page, add pages (simple tiling)
     let remainingHeight = imgHeight - (pageHeight - 40);
     while (remainingHeight > 0) {
       pdf.addPage();
@@ -81,7 +87,6 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
   }
 
   async function shareFile(file: File) {
-    // Use Web Share API with files when available
     if (typeof (navigator as any).canShare === 'function' && (navigator as any).canShare({ files: [file] }) && typeof (navigator as any).share === 'function') {
       try {
         await (navigator as any).share({ files: [file], title: file.name, text: file.name });
@@ -92,7 +97,6 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
       }
     }
 
-    // Fallback: download
     const link = document.createElement('a');
     link.href = URL.createObjectURL(file);
     link.download = file.name;
@@ -134,6 +138,33 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
     }
   }
 
+  function handleShareWhatsAppText() {
+    const itemLines = sale.items.map(i => `• ${i.quantity}x ${i.product_name} (${i.suit_type}) @ Rs.${i.unit_price.toLocaleString()} = Rs.${i.total_price.toLocaleString()}`).join('\n');
+    const remaining = Math.max(0, sale.total_amount - sale.amount_paid);
+    
+    const textMsg = `*UB COLLECTION - WHOLESALE INVOICE*
+Invoice #: ${sale.invoice_no}
+Customer: ${sale.customer_name}${sale.shop_name ? ` (${sale.shop_name})` : ''}
+Date: ${new Date(sale.created_at).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}
+
+*ITEMS:*
+${itemLines}
+
+*TOTAL AMOUNT:* Rs. ${sale.total_amount.toLocaleString()}
+*AMOUNT PAID:* Rs. ${sale.amount_paid.toLocaleString()}
+*BALANCE DUE:* Rs. ${remaining.toLocaleString()}
+
+_Thank you for your business with UB Collection!_`;
+
+    if (navigator.share) {
+      navigator.share({ title: `Invoice #${sale.invoice_no}`, text: textMsg }).catch(() => {
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(textMsg)}`, '_blank');
+      });
+    } else {
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(textMsg)}`, '_blank');
+    }
+  }
+
   const remainingBalance = Math.max(0, sale.total_amount - sale.amount_paid);
 
   return (
@@ -142,16 +173,19 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
         {/* Action bar (hidden during print) */}
         <div className="inv-action-bar no-print">
           <button id="btn-print-browser" className="inv-btn inv-btn--primary" onClick={handleTriggerBrowserPrint}>
-            🖨️ Print Invoice (Browser / PDF)
+            🖨️ Print Invoice
+          </button>
+          <button id="btn-share-whatsapp" className="inv-btn inv-btn--whatsapp" onClick={handleShareWhatsAppText}>
+            💬 WhatsApp Text
           </button>
           <button id="btn-share-image" className="inv-btn inv-btn--secondary" onClick={handleShareAsImage}>
-            📷 Share as Image
+            📷 Share Image
           </button>
           <button id="btn-share-pdf" className="inv-btn inv-btn--secondary" onClick={handleShareAsPdf}>
-            📄 Share as PDF
+            📄 Share PDF
           </button>
           <button id="btn-print-thermal" className="inv-btn inv-btn--secondary" onClick={handleEscPosThermalPrintExtension}>
-            🧾 ESC/POS Thermal Print (Ext)
+            🧾 ESC/POS
           </button>
           <button className="inv-close-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>

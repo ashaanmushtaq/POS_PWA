@@ -61,6 +61,16 @@
 
 .inv-btn--secondary:hover { background: #475569; }
 
+.inv-btn--whatsapp {
+  background: #16a34a;
+  color: #ffffff;
+  border: 1px solid #22c55e;
+}
+
+.inv-btn--whatsapp:hover {
+  background: #15803d;
+}
+
 .inv-close-btn {
   margin-left: auto;
   background: transparent;

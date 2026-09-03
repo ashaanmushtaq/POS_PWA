@@ -65,6 +65,10 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
   const [showSettlementModal, setShowSettlementModal] = useState<boolean>(false);
   const [pendingCheckoutPayload, setPendingCheckoutPayload] = useState<OfflineSalePayload | null>(null);
 
+  // Mobile Navigation & View State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<'catalog' | 'cart'>('catalog');
+
   // Rate Change Nudge state
   const [rateNudge, setRateNudge] = useState<{
     product: PosProductItem;
@@ -383,15 +387,25 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
           <div className="pos-logo">👑</div>
           <div>
             <div className="pos-bar-title">UB COLLECTION POS</div>
-            <div className="pos-bar-sub">Wholesale Bulk Order Checkout & Counter</div>
+            <div className="pos-bar-sub">Wholesale Bulk Order Counter</div>
           </div>
         </div>
 
-        <div className="pos-bar-meta">
+        {/* Mobile Hamburger Menu Toggle */}
+        <button
+          id="btn-mobile-menu-toggle"
+          className="pos-mobile-menu-toggle"
+          onClick={() => setMobileMenuOpen(v => !v)}
+          aria-label="Toggle navigation menu"
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
+
+        <div className={`pos-bar-meta ${mobileMenuOpen ? 'pos-bar-meta--open' : ''}`}>
           <button
             id="btn-manage-catalog"
             className="pos-print-btn"
-            onClick={() => setShowCatalogModal(true)}
+            onClick={() => { setShowCatalogModal(true); setMobileMenuOpen(false); }}
           >
             📦 Manage Catalog
           </button>
@@ -400,15 +414,15 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
             <button
               id="btn-sync-queue"
               className="pos-sync-btn pos-sync-btn--warning"
-              onClick={triggerAutoSync}
+              onClick={() => { triggerAutoSync(); setMobileMenuOpen(false); }}
               disabled={syncing || !isOnline}
             >
-              {syncing ? '🔄 Syncing Database…' : `⚡ ${pendingSyncCount} Order${pendingSyncCount > 1 ? 's' : ''} Queued (Tap to Sync)`}
+              {syncing ? '🔄 Syncing Database…' : `⚡ ${pendingSyncCount} Order${pendingSyncCount > 1 ? 's' : ''} Queued`}
             </button>
           ) : (
             <span className={`pos-badge ${isOnline ? 'pos-badge--online' : 'pos-badge--offline'}`}>
               <span className="pos-badge-dot" />
-              {isOnline ? '🟢 Live Synced (Supabase Connected)' : '🔴 Offline Mode (Queuing Locally)'}
+              {isOnline ? '🟢 Live Connected' : '🔴 Offline Mode'}
             </span>
           )}
 
@@ -416,9 +430,9 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
             <button
               id="btn-print-last"
               className="pos-print-btn"
-              onClick={() => setShowPrintModal(true)}
+              onClick={() => { setShowPrintModal(true); setMobileMenuOpen(false); }}
             >
-              🖨️ Print Invoice #{lastSale.invoice_no}
+              🖨️ Invoice #{lastSale.invoice_no}
             </button>
           )}
 
@@ -436,6 +450,26 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
         </div>
       </div>
 
+      {/* Mobile Tab Switcher (< 768px Viewports) */}
+      <div className="pos-mobile-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={activeMobileTab === 'catalog'}
+          className={`pos-mobile-tab ${activeMobileTab === 'catalog' ? 'pos-mobile-tab--active' : ''}`}
+          onClick={() => setActiveMobileTab('catalog')}
+        >
+          📦 Catalog ({catalogProducts.length})
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeMobileTab === 'cart'}
+          className={`pos-mobile-tab ${activeMobileTab === 'cart' ? 'pos-mobile-tab--active' : ''}`}
+          onClick={() => setActiveMobileTab('cart')}
+        >
+          🛒 Checkout {cart.length > 0 ? `(${cart.length}) - ₨${grandTotal.toLocaleString()}` : ''}
+        </button>
+      </div>
+
       {message && (
         <div className={`pos-alert pos-alert--${message.type}`} role="alert">
           <span>{message.text}</span>
@@ -446,7 +480,7 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
       {/* ── Main Workspace ── */}
       <div className="pos-workspace">
         {/* ── Left Column: Catalog ── */}
-        <div className="pos-catalog-panel">
+        <div className={`pos-catalog-panel ${activeMobileTab === 'catalog' ? 'pos-panel--mobile-show' : 'pos-panel--mobile-hide'}`}>
           <div className="pos-catalog-header">
             <h2 className="pos-panel-title">📦 Suit Products Catalog</h2>
             <input
@@ -477,7 +511,7 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
         </div>
 
         {/* ── Right Column: Customer Selection, Purchase History & Checkout ── */}
-        <div className="pos-cart-panel">
+        <div className={`pos-cart-panel ${activeMobileTab === 'cart' ? 'pos-panel--mobile-show' : 'pos-panel--mobile-hide'}`}>
           {/* Customer Selection */}
           <div className="pos-cust-select-wrap">
             <div className="pos-cust-label-row">
@@ -740,12 +774,12 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
       {showAddCustModal && (
         <AddCustomerModal
           onClose={() => setShowAddCustModal(false)}
-          onSuccess={async (newCust) => {
+          onSuccess={(newCust) => {
             setShowAddCustModal(false);
             setMessage({ type: 'success', text: `✓ Added new wholesale customer: ${newCust.name}!` });
-            const updated = await fetchPosCustomers();
-            setCustomers(updated);
+            setCustomers(prev => [newCust, ...prev.filter(c => c.id !== newCust.id)]);
             setSelectedCustomerId(newCust.id);
+            fetchPosCustomers().then(updated => setCustomers(updated)).catch(console.warn);
           }}
         />
       )}
