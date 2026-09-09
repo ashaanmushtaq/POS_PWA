@@ -247,6 +247,20 @@
   margin: 0 0 2px 0;
 }
 
+.inv-installment-box {
+  margin-top: 0.75rem;
+}
+
+.inv-installment-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: #475569;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
 .inv-totals-box {
   display: flex;
   flex-direction: column;

@@ -6,10 +6,12 @@ import {
   type PosCustomer, type PosProductItem, type CustomerPriceHistoryRecord,
   type CustomerPaymentPlan,
 } from '../lib/posService';
+import { titleCase } from '../lib/posService';
 import { getPendingQueue, type OfflineSalePayload } from '../lib/offlineQueue';
 import { InvoicePrintModal } from './InvoicePrintModal';
 import { PosProductCatalogModal } from './PosProductCatalogModal';
 import { SettlementPlanModal } from './SettlementPlanModal';
+import type { TenantBranding } from '../lib/auth';
 import './PosCounter.css';
 
 export interface CartItem {
@@ -23,10 +25,16 @@ export interface CartItem {
 
 interface PosCounterProps {
   user: User;
+  branding?: TenantBranding | null;
   onSignOut: () => void;
 }
 
-export function PosCounter({ user, onSignOut }: PosCounterProps) {
+export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
+  const shopName = branding?.display_name || branding?.name || 'Wholesale POS';
+
+  useEffect(() => {
+    document.title = `${shopName} · POS Counter`;
+  }, [shopName]);
   const [customers, setCustomers] = useState<PosCustomer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -293,7 +301,8 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
     const salePayload: OfflineSalePayload = {
       id: clientUuid,
       customer_id: selectedCustomerId,
-      customer_name: selectedCustomer?.name || 'Wholesale Customer',
+      customer_name: titleCase(selectedCustomer?.name || 'Wholesale Customer'),
+      customer_phone: selectedCustomer?.phone || undefined,
       invoice_no: generatedInv,
       total_amount: grandTotal,
       amount_paid: numericPaid,
@@ -302,8 +311,8 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
       due_date: dueDate || undefined,
       notes: notes || undefined,
       sale_date: saleDate, // 🆕 Sale Date added here
-      shop_name: selectedCustomer?.shop_name || selectedCustomer?.company_name || undefined,
-      customer_address: selectedCustomer?.address || undefined,
+      shop_name: titleCase(selectedCustomer?.shop_name || selectedCustomer?.company_name || '') || undefined,
+      customer_address: titleCase(selectedCustomer?.address || '') || undefined,
       items: cart.map(i => ({
         product_id: i.product.id,
         product_name: i.product.name,
@@ -351,7 +360,18 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
       const res = await processPosCheckout(salePayload, plans);
       if (res.success) {
         setMessage({ type: 'success', text: res.message });
-        setLastSale(salePayload);
+        setLastSale({
+          ...salePayload,
+          installment_plans: plans.length > 0 ? plans.map(plan => ({
+            installment_no: plan.installment_no,
+            total_installments: plan.total_installments,
+            amount_due: plan.amount_due,
+            due_date: plan.due_date,
+            payment_method: plan.payment_method,
+            status: plan.status,
+            notes: plan.notes,
+          })) : undefined,
+        });
         setShowPrintModal(true);
         setCart([]);
         setAmountPaid('');
@@ -386,7 +406,7 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
         <div className="pos-bar-brand">
           <div className="pos-logo">👑</div>
           <div>
-            <div className="pos-bar-title">UB COLLECTION POS</div>
+            <div className="pos-bar-title">{shopName.toUpperCase()} POS</div>
             <div className="pos-bar-sub">Wholesale Bulk Order Counter</div>
           </div>
         </div>
@@ -634,7 +654,8 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
                             min="1"
                             className="pos-qty-input"
                             value={i.quantity}
-                            onChange={e => updateCartQty(i.product.id, parseInt(e.target.value, 10) || 1)}
+                            onFocus={e => e.currentTarget.select()}
+                            onChange={e => updateCartQty(i.product.id, e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
                           />
                         </td>
                         <td className="pos-num">
@@ -752,6 +773,7 @@ export function PosCounter({ user, onSignOut }: PosCounterProps) {
       {showPrintModal && lastSale && (
         <InvoicePrintModal
           sale={lastSale}
+          branding={branding}
           onClose={() => setShowPrintModal(false)}
         />
       )}
@@ -851,12 +873,12 @@ function AddCustomerModal({ onClose, onSuccess }: {
     setLoading(true); setError('');
     try {
       const created = await createPosCustomer({
-        name: form.name.trim(),
-        shop_name: form.shop_name?.trim() || undefined,
-        company_name: form.company_name.trim() || undefined,
+        name: titleCase(form.name),
+        shop_name: titleCase(form.shop_name) || undefined,
+        company_name: titleCase(form.company_name) || undefined,
         phone: form.phone.trim() || undefined,
-        city: form.city.trim() || undefined,
-        address: form.address?.trim() || undefined,
+        city: titleCase(form.city) || undefined,
+        address: titleCase(form.address) || undefined,
       });
       onSuccess(created);
     } catch (err: unknown) {

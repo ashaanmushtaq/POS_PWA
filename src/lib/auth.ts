@@ -1,11 +1,37 @@
 import { supabase } from './supabase';
 import type { User } from '@supabase/supabase-js';
+import { clearLocalData } from './offlineQueue';
 
 export interface PosUserProfile {
   id: string;
   full_name: string;
   role: string;
   tenant_id: string;
+}
+
+export interface TenantBranding {
+  id: string;
+  name: string;
+  display_name: string | null;
+  company_name: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  logo_url: string | null;
+}
+
+export async function getTenantBranding(tenantId: string): Promise<TenantBranding | null> {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, name, display_name, company_name, address, phone, email, logo_url')
+    .eq('id', tenantId)
+    .single();
+
+  if (error) {
+    console.warn('POS: Could not fetch tenant branding:', error.message);
+    return null;
+  }
+  return data as TenantBranding;
 }
 
 /** Sign in with email + password. Throws on failure. */
@@ -19,6 +45,7 @@ export async function signIn(email: string, password: string): Promise<User> {
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  await clearLocalData();
 }
 
 /** Get the current session user synchronously (null if not logged in). */

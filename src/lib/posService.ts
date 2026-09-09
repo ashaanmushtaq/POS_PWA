@@ -15,6 +15,10 @@ export interface PosCustomer {
   current_balance_due: number;
 }
 
+export function titleCase(value: string | null | undefined): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ').replace(/(^|[\s,.-])([a-z])/g, (_match, separator, letter) => `${separator}${letter.toUpperCase()}`);
+}
+
 export interface PosProductItem {
   id: string;
   name: string;
@@ -88,12 +92,12 @@ export async function fetchPosCustomers(): Promise<PosCustomer[]> {
       if (!error && data) {
         const mapped: PosCustomer[] = data.map((c: any) => ({
           id: c.customer_id,
-          name: c.customer_name,
-          company_name: c.company_name,
-          shop_name: c.shop_name ?? null,
+          name: titleCase(c.customer_name),
+          company_name: c.company_name ? titleCase(c.company_name) : null,
+          shop_name: c.shop_name ? titleCase(c.shop_name) : null,
           phone: c.phone,
-          address: c.address ?? null,
-          city: c.city,
+          address: c.address ? titleCase(c.address) : null,
+          city: c.city ? titleCase(c.city) : null,
           current_balance_due: c.current_balance_due,
         }));
         await setLocalCache('pos_customers', mapped);
@@ -116,15 +120,20 @@ export async function createPosCustomer(payload: {
   city?: string;
   address?: string;
 }): Promise<PosCustomer> {
+  const name = titleCase(payload.name);
+  const companyName = payload.company_name ? titleCase(payload.company_name) : null;
+  const shopName = payload.shop_name ? titleCase(payload.shop_name) : null;
+  const address = payload.address ? titleCase(payload.address) : null;
+  const city = payload.city ? titleCase(payload.city) : null;
   const { data, error } = await supabase
     .from('customers')
     .insert({
-      name: payload.name,
-      company_name: payload.company_name ?? null,
-      shop_name: payload.shop_name ?? null,
+      name,
+      company_name: companyName,
+      shop_name: shopName,
       phone: payload.phone ?? null,
-      address: payload.address ?? null,
-      city: payload.city ?? null,
+      address,
+      city,
     })
     .select('id, name, company_name, shop_name, phone, address, city')
     .single();
@@ -133,12 +142,12 @@ export async function createPosCustomer(payload: {
 
   return {
     id: data.id,
-    name: data.name,
-    company_name: data.company_name ?? null,
-    shop_name: data.shop_name ?? null,
+    name: titleCase(data.name),
+    company_name: data.company_name ? titleCase(data.company_name) : null,
+    shop_name: data.shop_name ? titleCase(data.shop_name) : null,
     phone: data.phone ?? null,
-    address: data.address ?? null,
-    city: data.city ?? null,
+    address: data.address ? titleCase(data.address) : null,
+    city: data.city ? titleCase(data.city) : null,
     current_balance_due: 0,
   };
 }
@@ -154,7 +163,7 @@ export async function fetchPosProducts(): Promise<PosProductItem[]> {
         .eq('is_active', true)
         .order('name');
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         const products = data.map((p: any) => ({
           id: p.id,
           name: p.name,
@@ -253,7 +262,7 @@ export async function updatePosProduct(id: string, payload: Partial<PosProductIt
   };
 
   if (navigator.onLine) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('pos_products')
       .update({
         name: updatedProduct.name,
@@ -267,10 +276,16 @@ export async function updatePosProduct(id: string, payload: Partial<PosProductIt
         is_active: updatedProduct.is_active ?? true,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id')
+      .single();
 
     if (error) {
-      console.warn('Supabase product update notice:', error.message);
+      throw new Error(`Product update failed: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('Product update failed: no database response');
     }
   }
 

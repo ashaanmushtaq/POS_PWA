@@ -44,8 +44,8 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
         <div className="pos-login-brand">
           <div className="pos-login-logo" aria-hidden="true">👑</div>
           <div>
-            <h1 className="pos-login-brand-name">UB Collection POS</h1>
-            <p className="pos-login-brand-tagline">Wholesale Counter · Garments ERP</p>
+            <h1 className="pos-login-brand-name">Wholesale POS</h1>
+            <p className="pos-login-brand-tagline">Shop Counter · Garments ERP</p>
           </div>
         </div>
 
@@ -82,7 +82,7 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
                 id="pos-login-email"
                 type="email"
                 className="pos-login-input"
-                placeholder="staff@ubcollection.pk"
+                placeholder="staff@shop.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"
@@ -95,19 +95,21 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
 
           {/* Password field */}
           <div className="pos-login-field">
-            <label htmlFor="pos-login-password" className="pos-login-label">Password</label>
+            <div className="pos-login-field-header">
+              <label htmlFor="pos-login-password" className="pos-login-label">Password</label>
+            </div>
             <div className="pos-login-input-wrap">
               <span className="pos-login-input-icon" aria-hidden="true">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                  <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
-                  <path d="M5 7V5a3 3 0 116 0v2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+                  <rect x="2" y="7" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+                  <path d="M5 7V4.5a3 3 0 0 1 6 0V7" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
                 </svg>
               </span>
               <input
                 id="pos-login-password"
                 type={showPassword ? 'text' : 'password'}
                 className="pos-login-input pos-login-input--with-action"
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"
@@ -137,6 +139,7 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
             </div>
           </div>
 
+          {/* Submit */}
           <button
             id="pos-login-submit"
             type="submit"
@@ -159,7 +162,7 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
         </div>
 
         <p className="pos-login-footer">
-          UB Collection Wholesale ERP · Multi-Tenant Garments Management
+          Garments Wholesale ERP · Multi-Tenant POS Counter
         </p>
       </div>
     </div>

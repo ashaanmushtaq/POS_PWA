@@ -2,14 +2,20 @@ import { useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import type { OfflineSalePayload } from '../lib/offlineQueue';
+import type { TenantBranding } from '../lib/auth';
 import './InvoicePrintModal.css';
 
 interface InvoicePrintModalProps {
   sale: OfflineSalePayload;
+  branding?: TenantBranding | null;
   onClose: () => void;
 }
 
-export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
+export function InvoicePrintModal({ sale, branding, onClose }: InvoicePrintModalProps) {
+  const shopName = branding?.display_name || branding?.name || 'Wholesale Store';
+  const companyTagline = branding?.company_name || 'Wholesale & Garments Manufacturing';
+  const contactInfo = [branding?.address, branding?.phone ? `Tel: ${branding.phone}` : ''].filter(Boolean).join(' · ') || 'Wholesale Market Hub';
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -141,10 +147,14 @@ export function InvoicePrintModal({ sale, onClose }: InvoicePrintModalProps) {
   function handleShareWhatsAppText() {
     const itemLines = sale.items.map(i => `• ${i.quantity}x ${i.product_name} (${i.suit_type}) @ Rs.${i.unit_price.toLocaleString()} = Rs.${i.total_price.toLocaleString()}`).join('\n');
     const remaining = Math.max(0, sale.total_amount - sale.amount_paid);
-    
-    const textMsg = `*UB COLLECTION - WHOLESALE INVOICE*
+
+    const installmentLines = sale.installment_plans?.length
+      ? `\n*INSTALLMENT PLAN:*\n${sale.installment_plans.map(plan => `#${plan.installment_no}/${plan.total_installments}: Rs.${plan.amount_due.toLocaleString()} due ${plan.due_date} (${plan.payment_method})`).join('\n')}`
+      : '';
+    const textMsg = `*${shopName.toUpperCase()} - WHOLESALE INVOICE*
 Invoice #: ${sale.invoice_no}
 Customer: ${sale.customer_name}${sale.shop_name ? ` (${sale.shop_name})` : ''}
+Phone: ${sale.customer_phone || 'N/A'}
 Date: ${new Date(sale.created_at).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}
 
 *ITEMS:*
@@ -153,8 +163,9 @@ ${itemLines}
 *TOTAL AMOUNT:* Rs. ${sale.total_amount.toLocaleString()}
 *AMOUNT PAID:* Rs. ${sale.amount_paid.toLocaleString()}
 *BALANCE DUE:* Rs. ${remaining.toLocaleString()}
+${installmentLines}
 
-_Thank you for your business with UB Collection!_`;
+_Thank you for your business with ${shopName}!_`;
 
     if (navigator.share) {
       navigator.share({ title: `Invoice #${sale.invoice_no}`, text: textMsg }).catch(() => {
@@ -194,9 +205,9 @@ _Thank you for your business with UB Collection!_`;
         <div className="inv-sheet" id="printable-invoice">
           <div className="inv-header">
             <div>
-              <h1 className="inv-company-name">UB COLLECTION</h1>
-              <div className="inv-company-tagline">Gents Suits Wholesale & Garments Manufacturing</div>
-              <div className="inv-company-contact">Main Cloth Market, Wholesale Hub · Tel: +92 300 1234567</div>
+              <h1 className="inv-company-name">{shopName.toUpperCase()}</h1>
+              <div className="inv-company-tagline">{companyTagline}</div>
+              <div className="inv-company-contact">{contactInfo}</div>
             </div>
             <div className="inv-header-meta">
               <div className="inv-invoice-badge">WHOLESALE INVOICE</div>
@@ -210,12 +221,13 @@ _Thank you for your business with UB Collection!_`;
           {/* Customer & Payment Info */}
           <div className="inv-info-row">
             <div className="inv-info-box">
-                <div className="inv-info-label">Customer Details</div>
-                <div className="inv-info-val"><strong>{sale.customer_name}</strong></div>
-                {sale.shop_name && <div style={{ fontWeight: 600 }}>{sale.shop_name}</div>}
-                {sale.customer_address && <div className="inv-info-sub">{sale.customer_address}</div>}
-                {!sale.shop_name && !sale.customer_address && <div className="inv-info-sub">Wholesale Account</div>}
-              </div>
+              <div className="inv-info-label">Customer Details</div>
+              <div className="inv-info-val"><strong>{sale.customer_name}</strong></div>
+              {sale.shop_name && <div style={{ fontWeight: 600 }}>{sale.shop_name}</div>}
+              {sale.customer_phone && <div className="inv-info-sub">Phone: {sale.customer_phone}</div>}
+              {sale.customer_address && <div className="inv-info-sub">{sale.customer_address}</div>}
+              {!sale.shop_name && !sale.customer_address && <div className="inv-info-sub">Wholesale Account</div>}
+            </div>
             <div className="inv-info-box">
               <div className="inv-info-label">Payment Status & Method</div>
               <div className="inv-info-val">
@@ -292,6 +304,18 @@ _Thank you for your business with UB Collection!_`;
               <p>3. Computer generated invoice — valid without physical signature.</p>
             </div>
 
+            {sale.installment_plans && sale.installment_plans.length > 0 && (
+              <div className="inv-terms-box inv-installment-box">
+                <div className="inv-terms-title">Installment Plan</div>
+                {sale.installment_plans.map(plan => (
+                  <div className="inv-installment-line" key={plan.installment_no}>
+                    <span>#{plan.installment_no}/{plan.total_installments} · {plan.due_date}</span>
+                    <strong>₨{plan.amount_due.toLocaleString()}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="inv-totals-box">
               <div className="inv-total-line">
                 <span>Total Amount:</span>
@@ -309,7 +333,8 @@ _Thank you for your business with UB Collection!_`;
           </div>
 
           <div className="inv-footer">
-            Thank you for your business with UB Collection!
+            Thank you for your business with {shopName}!
+            Crafted by Bellanix Tech
           </div>
         </div>
       </div>

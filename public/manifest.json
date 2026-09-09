@@ -1,7 +1,7 @@
 {
-  "name": "UB Collection - POS Counter",
-  "short_name": "UB POS",
-  "description": "Offline-first Shop Counter POS for UB Collection Wholesale Gents Suits",
+  "name": "Wholesale POS Counter",
+  "short_name": "POS Counter",
+  "description": "Offline-first Multi-Tenant Shop Counter POS",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

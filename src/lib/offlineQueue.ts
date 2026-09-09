@@ -23,6 +23,7 @@ export interface OfflineSalePayload {
   id: string; // Client-side UUID
   customer_id: string;
   customer_name: string;
+  customer_phone?: string;
   invoice_no: string; // e.g. OFFLINE-1725134000-1234
   total_amount: number;
   amount_paid: number;
@@ -33,9 +34,19 @@ export interface OfflineSalePayload {
   sale_date?: string;
   shop_name?: string;
   customer_address?: string;
+  installment_plans?: Array<{
+    installment_no: number;
+    total_installments: number;
+    amount_due: number;
+    due_date: string;
+    payment_method: string;
+    status: string;
+    notes?: string;
+  }>;
   items: OfflineSaleItem[];
   created_at: string;
   synced: boolean;
+  tenant_id?: string;
 }
 
 const DB_NAME = 'ub_pos_offline_db';
@@ -44,6 +55,19 @@ const STORE_QUEUE = 'sales_queue';
 const STORE_CACHE = 'catalog_cache';
 
 const inMemoryCache = new Map<string, any>();
+let activeTenantId: string | null = null;
+
+export function setActiveTenantId(tenantId: string): void {
+  activeTenantId = tenantId;
+}
+
+export function clearActiveTenantId(): void {
+  activeTenantId = null;
+}
+
+function tenantKey(key: string): string {
+  return `${activeTenantId || 'unassigned'}:${key}`;
+}
 
 // Initialize IndexedDB safely
 export function initIndexedDB(): Promise<IDBDatabase> {
@@ -70,17 +94,18 @@ export function initIndexedDB(): Promise<IDBDatabase> {
 
 // Queue an offline sale
 export async function enqueueOfflineSale(sale: OfflineSalePayload): Promise<void> {
+  const scopedSale = { ...sale, tenant_id: activeTenantId || undefined };
   try {
     const db = await initIndexedDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_QUEUE, 'readwrite');
       const store = tx.objectStore(STORE_QUEUE);
-      const req = store.put(sale);
+      const req = store.put(scopedSale);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
-    inMemoryCache.set(`queue_${sale.id}`, sale);
+    inMemoryCache.set(`queue_${sale.id}`, scopedSale);
   }
 }
 
@@ -94,14 +119,14 @@ export async function getPendingQueue(): Promise<OfflineSalePayload[]> {
       const req = store.getAll();
       req.onsuccess = () => {
         const all = (req.result as OfflineSalePayload[]) || [];
-        resolve(all.filter(item => !item.synced));
+        resolve(all.filter(item => !item.synced && item.tenant_id === activeTenantId));
       };
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
     const list: OfflineSalePayload[] = [];
     for (const [k, v] of inMemoryCache.entries()) {
-      if (k.startsWith('queue_') && !v.synced) list.push(v);
+      if (k.startsWith('queue_') && !v.synced && v.tenant_id === activeTenantId) list.push(v);
     }
     return list;
   }
@@ -125,34 +150,53 @@ export async function removeQueueItem(id: string): Promise<void> {
 
 // Cache generic data locally (customers, products catalog)
 export async function setLocalCache(key: string, data: unknown): Promise<void> {
+  const scopedKey = tenantKey(key);
   try {
     const db = await initIndexedDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_CACHE, 'readwrite');
       const store = tx.objectStore(STORE_CACHE);
-      const req = store.put({ key, value: data, timestamp: new Date().toISOString() });
+      const req = store.put({ key: scopedKey, value: data, timestamp: new Date().toISOString() });
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
-    inMemoryCache.set(key, data);
+    inMemoryCache.set(scopedKey, data);
   }
 }
 
 // Retrieve cached generic data
 export async function getLocalCache<T>(key: string): Promise<T | null> {
+  const scopedKey = tenantKey(key);
   try {
     const db = await initIndexedDB();
     return new Promise((resolve) => {
       const tx = db.transaction(STORE_CACHE, 'readonly');
       const store = tx.objectStore(STORE_CACHE);
-      const req = store.get(key);
+      const req = store.get(scopedKey);
       req.onsuccess = () => {
-        resolve(req.result ? (req.result.value as T) : (inMemoryCache.get(key) as T) || null);
+        resolve(req.result ? (req.result.value as T) : (inMemoryCache.get(scopedKey) as T) || null);
       };
-      req.onerror = () => resolve((inMemoryCache.get(key) as T) || null);
+      req.onerror = () => resolve((inMemoryCache.get(scopedKey) as T) || null);
     });
   } catch {
-    return (inMemoryCache.get(key) as T) || null;
+    return (inMemoryCache.get(scopedKey) as T) || null;
+  }
+}
+
+export async function clearLocalData(): Promise<void> {
+  inMemoryCache.clear();
+  try {
+    const db = await initIndexedDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([STORE_QUEUE, STORE_CACHE], 'readwrite');
+      tx.objectStore(STORE_QUEUE).clear();
+      tx.objectStore(STORE_CACHE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('Could not clear local POS data:', err);
   }
 }
