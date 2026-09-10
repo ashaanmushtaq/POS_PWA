@@ -13,6 +13,7 @@ import { PosProductCatalogModal } from './PosProductCatalogModal';
 import { SettlementPlanModal } from './SettlementPlanModal';
 import type { TenantBranding } from '../lib/auth';
 import './PosCounter.css';
+import { ThemeToggle } from '../lib/theme';
 
 export interface CartItem {
   product: PosProductItem;
@@ -422,6 +423,7 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
         </button>
 
         <div className={`pos-bar-meta ${mobileMenuOpen ? 'pos-bar-meta--open' : ''}`}>
+          <ThemeToggle />
           <button
             id="btn-manage-catalog"
             className="pos-print-btn"

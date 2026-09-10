@@ -262,3 +262,27 @@
   color: #334155;
   margin-top: 1.75rem;
 }
+
+:root[data-theme='light'] .pos-login-root {
+  background: var(--bg-base);
+}
+
+:root[data-theme='light'] .pos-login-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-lg);
+}
+
+:root[data-theme='light'] .pos-login-brand-name,
+:root[data-theme='light'] .pos-login-heading { color: var(--text-primary); }
+:root[data-theme='light'] .pos-login-brand-tagline,
+:root[data-theme='light'] .pos-login-subheading { color: var(--text-secondary); }
+:root[data-theme='light'] .pos-login-label { color: var(--text-secondary); }
+:root[data-theme='light'] .pos-login-input {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+:root[data-theme='light'] .pos-login-input::placeholder,
+:root[data-theme='light'] .pos-login-input-icon,
+:root[data-theme='light'] .pos-login-input-action { color: var(--text-muted); }

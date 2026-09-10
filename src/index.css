@@ -25,6 +25,24 @@
   --radius-lg: 12px;
 }
 
+:root[data-theme='light'] {
+  --bg-base:        #f4f7fb;
+  --bg-surface:     #ffffff;
+  --bg-card:        #ffffff;
+  --bg-elevated:    #e8eef7;
+  --accent:         #1d4ed8;
+  --accent-hover:   #1e40af;
+  --gold:           #b45309;
+  --gold-glow:      rgba(180, 83, 9, 0.2);
+  --success:        #047857;
+  --error:          #b91c1c;
+  --border:         #d5dfed;
+  --border-light:   #b9c8dc;
+  --text-primary:   #172033;
+  --text-secondary: #475569;
+  --text-muted:     #64748b;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -40,3 +58,20 @@ html, body, #root {
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
+
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--gold);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.theme-toggle:hover { background: var(--bg-surface); color: var(--accent); }

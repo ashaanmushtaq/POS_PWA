@@ -84,6 +84,11 @@
 
 .inv-close-btn:hover { background: #334155; color: #fff; }
 
+:root[data-theme='light'] .inv-modal-backdrop { background: rgba(15, 23, 42, 0.38); }
+:root[data-theme='light'] .inv-modal-box { background: var(--bg-card); border-color: var(--border); box-shadow: var(--shadow-lg); }
+:root[data-theme='light'] .inv-header { background: var(--bg-elevated); border-color: var(--border); }
+:root[data-theme='light'] .inv-close-btn { background: var(--bg-elevated); color: var(--text-secondary); border-color: var(--border); }
+
 /* ─── Printable Sheet ────────────────────────────────── */
 .inv-sheet {
   background: #ffffff;

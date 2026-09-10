@@ -5,6 +5,7 @@ import type { TenantBranding } from './lib/auth';
 import { clearActiveTenantId, clearLocalData, setActiveTenantId } from './lib/offlineQueue';
 import { PosLoginPage } from './components/PosLoginPage';
 import { PosCounter } from './components/PosCounter';
+import { ThemeToggle } from './lib/theme';
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated';
 
@@ -73,24 +74,25 @@ function PosSplash() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#060b18',
+      background: 'var(--bg-base)',
       flexDirection: 'column',
       gap: '1rem',
       fontFamily: 'Inter, system-ui, sans-serif',
     }}>
+      <ThemeToggle />
       <div style={{
         fontSize: '2rem',
         filter: 'drop-shadow(0 0 20px rgba(37,99,235,0.5))',
       }}>👑</div>
       <div style={{
         width: '36px', height: '36px',
-        border: '3px solid rgba(79,142,247,0.2)',
-        borderTopColor: '#4f8ef7',
+        border: '3px solid var(--accent-glow)',
+        borderTopColor: 'var(--accent)',
         borderRadius: '50%',
         animation: 'pos-spin 0.8s linear infinite',
       }} />
       <style>{`@keyframes pos-spin { to { transform: rotate(360deg); } }`}</style>
-      <p style={{ color: '#4e607d', fontSize: '0.85rem', margin: 0 }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
         Loading POS Counter…
       </p>
     </div>

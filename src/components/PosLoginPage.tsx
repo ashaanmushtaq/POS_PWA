@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { signIn } from '../lib/auth';
 import './PosLoginPage.css';
+import { ThemeToggle } from '../lib/theme';
 
 interface PosLoginPageProps {
   onSuccess: () => void;
@@ -40,6 +41,7 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
       <div className="pos-login-orb pos-login-orb--3" />
 
       <div className="pos-login-card" role="main">
+        <ThemeToggle />
         {/* Brand */}
         <div className="pos-login-brand">
           <div className="pos-login-logo" aria-hidden="true">👑</div>

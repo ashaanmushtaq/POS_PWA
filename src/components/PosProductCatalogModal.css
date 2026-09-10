@@ -140,3 +140,9 @@
 .prod-act-btn--edit:hover { background: rgba(56, 189, 248, 0.3); }
 .prod-act-btn--del { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5; }
 .prod-act-btn--del:hover { background: rgba(239, 68, 68, 0.3); }
+
+:root[data-theme='light'] .prod-modal-backdrop { background: rgba(15, 23, 42, 0.38); }
+:root[data-theme='light'] .prod-modal-box { background: var(--bg-card); border-color: var(--border); box-shadow: var(--shadow-lg); }
+:root[data-theme='light'] .prod-modal-header { background: var(--bg-elevated); border-color: var(--border); }
+:root[data-theme='light'] .prod-modal-title { color: var(--text-primary); }
+:root[data-theme='light'] .prod-form-card { background: var(--bg-elevated); border-color: var(--border); }

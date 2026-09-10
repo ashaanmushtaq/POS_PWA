@@ -706,6 +706,31 @@
   color: var(--text-primary);
 }
 
+/* Light mode: make customer history a readable data panel, not a grey overlay. */
+:root[data-theme='light'] .pos-history-wrap {
+  background: #ffffff;
+  border-color: #c9d8ea;
+  box-shadow: 0 3px 10px rgba(30, 64, 175, 0.06);
+}
+:root[data-theme='light'] .pos-history-toggle {
+  color: #1d4ed8;
+}
+:root[data-theme='light'] .pos-history-table-wrap {
+  border-top-color: #d7e2f0;
+}
+:root[data-theme='light'] .pos-history-table th {
+  background: #eef4fb;
+  color: #334155;
+  border-bottom-color: #c9d8ea;
+}
+:root[data-theme='light'] .pos-history-table td {
+  color: #172033;
+  border-bottom-color: #e2eaf3;
+}
+:root[data-theme='light'] .pos-history-table tbody tr:nth-child(even) td {
+  background: #f8fbff;
+}
+
 /* ── Rate Nudge Modal ── */
 .pos-nudge-backdrop {
   position: fixed;
