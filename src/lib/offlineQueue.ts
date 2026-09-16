@@ -65,6 +65,10 @@ export function clearActiveTenantId(): void {
   activeTenantId = null;
 }
 
+export function getActiveTenantId(): string | null {
+  return activeTenantId;
+}
+
 function tenantKey(key: string): string {
   return `${activeTenantId || 'unassigned'}:${key}`;
 }

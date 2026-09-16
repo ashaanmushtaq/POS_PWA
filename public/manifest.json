@@ -1,16 +1,16 @@
 {
-  "name": "Wholesale POS Counter",
-  "short_name": "POS Counter",
-  "description": "Offline-first Multi-Tenant Shop Counter POS",
+  "name": "Karobit POS Counter",
+  "short_name": "Karobit POS",
+  "description": "Karobit Smart Point of Sale · Powering Smarter Businesses.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0284c7",
+  "background_color": "#001438",
+  "theme_color": "#001438",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
   ]
 }

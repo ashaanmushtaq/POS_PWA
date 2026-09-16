@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { signIn } from '../lib/auth';
 import './PosLoginPage.css';
 import { ThemeToggle } from '../lib/theme';
+import karobitMark from '../assets/karobit-mark.png';
 
 interface PosLoginPageProps {
   onSuccess: () => void;
@@ -44,10 +45,16 @@ export function PosLoginPage({ onSuccess }: PosLoginPageProps) {
         <ThemeToggle />
         {/* Brand */}
         <div className="pos-login-brand">
-          <div className="pos-login-logo" aria-hidden="true">👑</div>
+          <div className="pos-login-logo" aria-hidden="true">
+            <img
+              src={karobitMark}
+              alt="Karobit"
+              style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+            />
+          </div>
           <div>
-            <h1 className="pos-login-brand-name">Wholesale POS</h1>
-            <p className="pos-login-brand-tagline">Shop Counter · Garments ERP</p>
+            <h1 className="pos-login-brand-name">Karobit POS</h1>
+            <p className="pos-login-brand-tagline">Powering Smarter Businesses.</p>
           </div>
         </div>
 

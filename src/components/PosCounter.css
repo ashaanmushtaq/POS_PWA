@@ -330,13 +330,22 @@
 
 .pos-qty-input, .pos-price-input {
   width: 60px;
-  background: var(--bg-base);
+  min-height: 34px;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  color: #fff;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
   padding: 4px 6px;
   font-size: 0.825rem;
+  font-weight: 800;
   text-align: center;
+  color-scheme: light dark;
+}
+
+.pos-qty-input:focus, .pos-price-input:focus {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-offset: 1px;
 }
 
 .pos-remove-btn {
@@ -437,9 +446,654 @@
   display: none;
 }
 
-@media (max-width: 900px) {
-  .pos-workspace { flex-direction: column; overflow-y: auto; }
-  .pos-catalog-panel, .pos-cart-panel { flex: none; width: 100%; }
+/* ── Persistent Customer Quick-Bar (Counter Top) ── */
+.pos-customer-quickbar {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pos-cqb-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.pos-cqb-label {
+  font-size: 0.825rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pos-cqb-select {
+  flex: 1;
+  max-width: 480px;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.pos-cqb-select:focus {
+  border-color: var(--accent);
+}
+
+.pos-cqb-add-btn {
+  background: var(--bg-surface);
+  border: 1px dashed var(--accent);
+  color: var(--accent-hover);
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.pos-cqb-add-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-style: solid;
+}
+
+.pos-cqb-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+}
+
+.pos-cqb-info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.pos-cqb-icon {
+  font-size: 1.1rem;
+}
+
+.pos-cqb-names {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.pos-cqb-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.pos-cqb-company {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pos-cqb-dues-pill {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+}
+
+.pos-cqb-dues--has {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+}
+
+.pos-cqb-dues--zero {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+.pos-cqb-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pos-cqb-action-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.pos-cqb-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+
+.pos-cqb-action-btn--active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.pos-cqb-action-btn--pay {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.pos-cqb-action-btn--pay:hover {
+  background: #10b981;
+  color: #fff;
+}
+
+.pos-cqb-switch-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-md);
+}
+
+.pos-cqb-switch-btn:hover {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Cart Customer Chip ── */
+.pos-cart-customer-chip {
+  margin-bottom: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+}
+
+.pos-ccc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pos-ccc-row--alert {
+  color: var(--gold);
+  font-size: 0.825rem;
+  font-weight: 700;
+}
+
+.pos-ccc-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.pos-ccc-badge strong {
+  color: var(--text-primary);
+}
+
+.pos-ccc-shop {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.pos-ccc-dues {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+
+.pos-ccc-dues--pending {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.pos-ccc-dues--ok {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.pos-ccc-link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-hover);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.pos-ccc-link-btn:hover {
+  text-decoration: underline;
+}
+
+.pos-ccc-link-btn--select {
+  background: var(--accent);
+  color: #fff;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-md);
+}
+
+/* ── Dedicated Customer Panel ── */
+.pos-customer-panel {
+  display: none;
+  flex-direction: column;
+  padding: 1.25rem;
+  background: var(--bg-surface);
+  overflow-y: auto;
+  flex: 10;
+  width: 100%;
+}
+
+.pos-customer-panel--active {
+  display: flex !important;
+}
+
+.pos-customer-panel--hidden {
+  display: none !important;
+}
+
+.pos-customer-panel-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pos-cpp-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pos-panel-subtext {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.pos-panel-back-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.pos-panel-back-btn:hover {
+  filter: brightness(1.1);
+}
+
+.pos-cpp-select-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pos-cpp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.pos-cpp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.pos-cpp-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.pos-cpp-stat-card--danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, var(--bg-card), rgba(239, 68, 68, 0.08));
+}
+
+.pos-cpp-stat-card--success {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, var(--bg-card), rgba(16, 185, 129, 0.08));
+}
+
+.pos-cpp-stat-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 0.35rem;
+}
+
+.pos-cpp-stat-val {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.pos-cpp-stat-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.pos-cpp-payment-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(234, 179, 8, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.25rem;
+  color: var(--text-primary);
+}
+
+.pos-cpp-receive-btn {
+  background: #10b981;
+  border: none;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 0.55rem 1.15rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  white-space: nowrap;
+}
+
+.pos-cpp-receive-btn:hover {
+  filter: brightness(1.1);
+}
+
+.pos-cpp-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.15rem;
+}
+
+.pos-cpp-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pos-cpp-section-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pos-cpp-section-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pos-cpp-empty-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+
+.pos-cpp-plans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.pos-cpp-plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.pos-cpp-plan-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pos-cpp-plan-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pos-cpp-plan-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pos-cpp-plan-badge--pending, .pos-cpp-plan-badge--planned {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.pos-cpp-plan-badge--received {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.pos-cpp-plan-details {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pos-cpp-plan-amounts {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pos-cpp-plan-sum {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.pos-cpp-cheque-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.pos-cpp-no-customer {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-muted);
+}
+
+.pos-cpp-no-cust-icon {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.4;
+}
+
+/* Floating Checkout Bar for Mobile Catalog */
+.pos-floating-checkout-bar {
+  display: none;
+}
+
+/* ── Responsive Viewport Rules ── */
+@media (min-width: 1024px) {
+  .pos-mobile-tabs {
+    display: none;
+  }
+
+  .pos-workspace {
+    flex-direction: row;
+    overflow: hidden;
+  }
+
+  .pos-catalog-panel {
+    flex: 6;
+    display: flex !important;
+  }
+
+  .pos-cart-panel {
+    flex: 4;
+    display: flex !important;
+  }
+
+  .pos-customer-panel--active {
+    position: fixed;
+    top: 60px;
+    right: 0;
+    bottom: 0;
+    width: min(680px, 90vw);
+    z-index: 250;
+    box-shadow: -8px 0 25px rgba(0, 0, 0, 0.5);
+    border-left: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 1023px) {
+  .pos-workspace {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .pos-mobile-tabs {
+    display: flex;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.4rem;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .pos-mobile-tab {
+    flex: 1;
+    padding: 0.6rem 0.4rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pos-mobile-tab--active {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  }
+
+  .pos-panel--mobile-hide {
+    display: none !important;
+  }
+
+  .pos-panel--mobile-show {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 !important;
+  }
+
+  .pos-customer-panel--active {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 !important;
+  }
+
+  .pos-customer-quickbar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .pos-floating-checkout-bar {
+    display: flex;
+    position: sticky;
+    bottom: 0.75rem;
+    margin-top: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    color: #ffffff;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    z-index: 100;
+  }
+
+  .pos-floating-checkout-btn {
+    background: #ffffff;
+    color: #1e3a8a;
+    border: none;
+    font-weight: 900;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
 }
 
 @media (max-width: 768px) {
@@ -471,48 +1125,7 @@
     display: flex;
   }
 
-  .pos-mobile-tabs {
-    display: flex;
-    background: var(--bg-surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0.4rem;
-    gap: 0.5rem;
-    flex-shrink: 0;
-  }
-
-  .pos-mobile-tab {
-    flex: 1;
-    padding: 0.65rem 0.5rem;
-    border-radius: var(--radius-md);
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    font-size: 0.825rem;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: center;
-    font-family: inherit;
-    transition: all 0.2s ease;
-  }
-
-  .pos-mobile-tab--active {
-    background: var(--accent);
-    color: #ffffff;
-    border-color: var(--accent);
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
-  }
-
-  .pos-panel--mobile-hide {
-    display: none !important;
-  }
-
-  .pos-panel--mobile-show {
-    display: flex !important;
-    width: 100% !important;
-    flex: 1 !important;
-  }
-
-  .pos-catalog-panel, .pos-cart-panel {
+  .pos-catalog-panel, .pos-cart-panel, .pos-customer-panel {
     border-right: none;
     padding: 0.85rem;
   }
@@ -525,6 +1138,18 @@
     flex-direction: column;
     align-items: stretch;
     gap: 0.65rem;
+  }
+
+  .pos-cqb-selected {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .pos-cqb-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 

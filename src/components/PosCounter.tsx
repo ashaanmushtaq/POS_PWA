@@ -3,14 +3,19 @@ import type { User } from '@supabase/supabase-js';
 import {
   fetchPosCustomers, createPosCustomer, processPosCheckout, syncOfflineSalesQueue,
   fetchPosProducts, fetchCustomerPurchaseHistory,
+  fetchCustomerPaymentPlans, fetchCustomerReceipts, fetchAllPosReceipts,
+  receiveCustomerPayment, correctPosReceipt, savePosReceipt, confirmChequeClearance,
   type PosCustomer, type PosProductItem, type CustomerPriceHistoryRecord,
-  type CustomerPaymentPlan,
+  type CustomerPaymentPlan, type PosReceipt,
+  type ReceivePaymentPayload,
 } from '../lib/posService';
 import { titleCase } from '../lib/posService';
 import { getPendingQueue, type OfflineSalePayload } from '../lib/offlineQueue';
 import { InvoicePrintModal } from './InvoicePrintModal';
 import { PosProductCatalogModal } from './PosProductCatalogModal';
 import { SettlementPlanModal } from './SettlementPlanModal';
+import { ReceiptHistory } from './ReceiptHistory';
+import { ReceivePaymentModal } from './ReceivePaymentModal';
 import type { TenantBranding } from '../lib/auth';
 import './PosCounter.css';
 import { ThemeToggle } from '../lib/theme';
@@ -27,11 +32,13 @@ export interface CartItem {
 interface PosCounterProps {
   user: User;
   branding?: TenantBranding | null;
+  profile?: import('../lib/auth').PosUserProfile | null;
   onSignOut: () => void;
 }
 
-export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
+export function PosCounter({ user, branding, profile, onSignOut }: PosCounterProps) {
   const shopName = branding?.display_name || branding?.name || 'Wholesale POS';
+  const userRole = profile?.role || 'shop_staff';
 
   useEffect(() => {
     document.title = `${shopName} · POS Counter`;
@@ -41,6 +48,10 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<PosProductItem[]>([]);
   const [customerHistory, setCustomerHistory] = useState<CustomerPriceHistoryRecord[]>([]);
+  const [paymentPlans, setPaymentPlans] = useState<CustomerPaymentPlan[]>([]);
+  const [receipts, setReceipts] = useState<PosReceipt[]>([]);
+  const [allReceipts, setAllReceipts] = useState<PosReceipt[]>([]);
+  const [showAllReceiptsModal, setShowAllReceiptsModal] = useState<boolean>(false);
 
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'cheque' | 'bank_transfer' | 'jazzcash' | 'easypaisa'>('cash');
@@ -69,14 +80,16 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
   const [showAddCustModal, setShowAddCustModal] = useState<boolean>(false);
   const [showCatalogModal, setShowCatalogModal] = useState<boolean>(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [viewReceipt, setViewReceipt] = useState<PosReceipt | null>(null);
 
   // Settlement Plan state (Part 2)
   const [showSettlementModal, setShowSettlementModal] = useState<boolean>(false);
   const [pendingCheckoutPayload, setPendingCheckoutPayload] = useState<OfflineSalePayload | null>(null);
 
-  // Mobile Navigation & View State
+  // Mobile & Tablet Navigation / Panel State
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const [activeMobileTab, setActiveMobileTab] = useState<'catalog' | 'cart'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'cart' | 'customer'>('catalog');
 
   // Rate Change Nudge state
   const [rateNudge, setRateNudge] = useState<{
@@ -102,20 +115,32 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
   useEffect(() => {
     if (selectedCustomerId) {
       loadCustomerHistory(selectedCustomerId);
+      loadCustomerFinancials(selectedCustomerId);
     } else {
       setCustomerHistory([]);
     }
   }, [selectedCustomerId]);
 
+  async function loadAllReceipts() {
+    try {
+      const all = await fetchAllPosReceipts();
+      setAllReceipts(all);
+    } catch (err) {
+      console.warn('Load all receipts error:', err);
+    }
+  }
+
   async function loadInitialData() {
     setLoading(true);
     try {
-      const [custs, prods] = await Promise.all([
+      const [custs, prods, allR] = await Promise.all([
         fetchPosCustomers(),
         fetchPosProducts(),
+        fetchAllPosReceipts(),
       ]);
       setCustomers(custs);
       setCatalogProducts(prods);
+      setAllReceipts(allR);
       if (custs.length > 0 && !selectedCustomerId) {
         setSelectedCustomerId(custs[0].id);
       }
@@ -142,6 +167,19 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
       setCustomerHistory(hist);
     } catch (err) {
       console.warn('Customer history load warning:', err);
+    }
+  }
+
+  async function loadCustomerFinancials(custId: string) {
+    try {
+      const [plans, savedReceipts] = await Promise.all([
+        fetchCustomerPaymentPlans(custId),
+        fetchCustomerReceipts(custId),
+      ]);
+      setPaymentPlans(plans);
+      setReceipts(savedReceipts);
+    } catch (err) {
+      console.warn('Customer financial history load warning:', err);
     }
   }
 
@@ -282,6 +320,8 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
   const remainingDue = grandTotal - numericPaid;
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const totalPlannedDue = paymentPlans.reduce((sum, p) => sum + Number(p.amount_due || 0), 0);
+  const totalPlannedPaid = paymentPlans.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0);
 
   async function handleCheckoutSubmit(e: FormEvent) {
     e.preventDefault();
@@ -384,6 +424,7 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
         setSaleDate(today.toISOString().split('T')[0]);
         await updatePendingCount();
         if (selectedCustomerId) await loadCustomerHistory(selectedCustomerId);
+        if (selectedCustomerId) await loadCustomerFinancials(selectedCustomerId);
       } else {
         setMessage({ type: 'error', text: res.message });
       }
@@ -391,6 +432,74 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Checkout failed' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleReceivePayment(payload: ReceivePaymentPayload) {
+    if (!selectedCustomer) return;
+    try {
+      const res = await receiveCustomerPayment({ ...payload, customer_id: selectedCustomer.id });
+      if (res.isPendingCheque) {
+        setMessage({
+          type: 'info',
+          text: `⏳ Cheque #${payload.reference_no || ''} registered as received pending bank clearance. Dues will be deducted upon confirmation.`,
+        });
+      } else {
+        const paymentId = res.paymentId || `pay-${Date.now()}`;
+        const paymentReceipt: OfflineSalePayload = {
+          id: `payment-${paymentId}`,
+          customer_id: selectedCustomer.id,
+          customer_name: selectedCustomer.name,
+          customer_phone: selectedCustomer.phone || undefined,
+          invoice_no: `PAY-${paymentId.slice(0, 8).toUpperCase()}`,
+          total_amount: payload.amount,
+          amount_paid: payload.amount,
+          payment_method: payload.payment_method,
+          reference_no: payload.reference_no,
+          notes: payload.notes || 'POS installment / balance payment',
+          created_at: new Date().toISOString(),
+          items: [],
+          synced: true,
+        };
+        await savePosReceipt(paymentReceipt, payload.sale_id || null, paymentId, 'payment');
+        setMessage({ type: 'success', text: `✓ Payment of PKR ${payload.amount.toLocaleString()} recorded and receipt saved permanently.` });
+      }
+      await loadInitialData();
+      await loadCustomerFinancials(selectedCustomer.id);
+      await loadAllReceipts();
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Payment recording failed.' });
+    }
+  }
+
+  async function handleCorrectReceipt(receipt: PosReceipt, snapshot: OfflineSalePayload, reason: string) {
+    try {
+      await correctPosReceipt(receipt, snapshot, reason);
+      setMessage({ type: 'success', text: `✓ Receipt #${receipt.invoice_no} corrected. Customer balance recalculated.` });
+      await loadInitialData();
+      if (selectedCustomerId) {
+        await loadCustomerFinancials(selectedCustomerId);
+      }
+      await loadAllReceipts();
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Receipt correction failed.' });
+    }
+  }
+
+  async function handleConfirmChequeClearance(plan: CustomerPaymentPlan) {
+    if (!plan.id) return;
+    const ok = window.confirm(`Confirm bank clearance for Cheque #${plan.cheque_no || plan.installment_no} of PKR ${Number(plan.amount_due - plan.amount_paid).toLocaleString()}?`);
+    if (!ok) return;
+    try {
+      await confirmChequeClearance(plan.id);
+      setMessage({ type: 'success', text: `✓ Cheque #${plan.cheque_no || ''} marked as CLEARED. Customer dues deducted.` });
+      await loadInitialData();
+      if (selectedCustomerId) {
+        await loadCustomerFinancials(selectedCustomerId);
+      }
+      await loadAllReceipts();
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Cheque clearance confirmation failed.' });
     }
   }
 
@@ -408,7 +517,14 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
           <div className="pos-logo">👑</div>
           <div>
             <div className="pos-bar-title">{shopName.toUpperCase()} POS</div>
-            <div className="pos-bar-sub">Wholesale Bulk Order Counter</div>
+            <div className="pos-bar-sub" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <span>Wholesale Bulk Order Counter</span>
+              <span style={{ opacity: 0.4 }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', opacity: 0.75, fontSize: '0.75rem' }}>
+                <img src="/src/assets/karobit-mark.png" alt="" style={{ width: '11px', height: '11px', objectFit: 'contain' }} />
+                <span>Powered by <strong>Karobit</strong></span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -430,6 +546,18 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
             onClick={() => { setShowCatalogModal(true); setMobileMenuOpen(false); }}
           >
             📦 Manage Catalog
+          </button>
+
+          <button
+            id="btn-all-receipts"
+            className="pos-print-btn"
+            onClick={() => {
+              loadAllReceipts();
+              setShowAllReceiptsModal(true);
+              setMobileMenuOpen(false);
+            }}
+          >
+            📜 All Receipts
           </button>
 
           {pendingSyncCount > 0 ? (
@@ -472,23 +600,110 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
         </div>
       </div>
 
-      {/* Mobile Tab Switcher (< 768px Viewports) */}
+      {/* ── Persistent Customer Quick-Bar ── */}
+      <div className="pos-customer-quickbar">
+        {!selectedCustomer ? (
+          <div className="pos-cqb-empty">
+            <span className="pos-cqb-label">👤 Wholesale Customer:</span>
+            <select
+              id="pos-cust-select-quick"
+              className="pos-cqb-select"
+              value={selectedCustomerId}
+              onChange={e => setSelectedCustomerId(e.target.value)}
+            >
+              <option value="">— Select Customer to Start Order —</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.company_name ? `(${c.company_name})` : ''} — Dues: ₨{c.current_balance_due.toLocaleString()}
+                </option>
+              ))}
+            </select>
+            <button
+              id="btn-add-cust-pos-quick"
+              type="button"
+              className="pos-cqb-add-btn"
+              onClick={() => setShowAddCustModal(true)}
+            >
+              + Add Customer
+            </button>
+          </div>
+        ) : (
+          <div className="pos-cqb-selected">
+            <div className="pos-cqb-info">
+              <span className="pos-cqb-icon">👤</span>
+              <div className="pos-cqb-names">
+                <span className="pos-cqb-name">{selectedCustomer.name}</span>
+                {selectedCustomer.company_name && (
+                  <span className="pos-cqb-company">({selectedCustomer.company_name})</span>
+                )}
+              </div>
+              <span className={`pos-cqb-dues-pill ${selectedCustomer.current_balance_due > 0 ? 'pos-cqb-dues--has' : 'pos-cqb-dues--zero'}`}>
+                {selectedCustomer.current_balance_due > 0 
+                  ? `Dues: ₨${selectedCustomer.current_balance_due.toLocaleString()}`
+                  : '✓ Dues Clear'}
+              </span>
+            </div>
+            <div className="pos-cqb-actions">
+              <button
+                type="button"
+                id="btn-goto-customer-ledger"
+                className={`pos-cqb-action-btn ${activeTab === 'customer' ? 'pos-cqb-action-btn--active' : ''}`}
+                onClick={() => setActiveTab(activeTab === 'customer' ? (cart.length > 0 ? 'cart' : 'catalog') : 'customer')}
+              >
+                {activeTab === 'customer' ? '← Back to Counter' : '📋 Customer Ledger & Dues'}
+              </button>
+              {selectedCustomer.current_balance_due > 0 && (
+                <button
+                  type="button"
+                  id="btn-quick-receive-payment"
+                  className="pos-cqb-action-btn pos-cqb-action-btn--pay"
+                  onClick={() => setShowPaymentModal(true)}
+                >
+                  💵 Receive Payment
+                </button>
+              )}
+              <button
+                type="button"
+                id="btn-switch-customer"
+                className="pos-cqb-switch-btn"
+                onClick={() => setSelectedCustomerId('')}
+                title="Select another customer"
+              >
+                ✕ Switch
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Mode & Tab Switcher (Mobile & Tablet) ── */}
       <div className="pos-mobile-tabs" role="tablist">
         <button
           role="tab"
-          aria-selected={activeMobileTab === 'catalog'}
-          className={`pos-mobile-tab ${activeMobileTab === 'catalog' ? 'pos-mobile-tab--active' : ''}`}
-          onClick={() => setActiveMobileTab('catalog')}
+          id="tab-catalog"
+          aria-selected={activeTab === 'catalog'}
+          className={`pos-mobile-tab ${activeTab === 'catalog' ? 'pos-mobile-tab--active' : ''}`}
+          onClick={() => setActiveTab('catalog')}
         >
           📦 Catalog ({catalogProducts.length})
         </button>
         <button
           role="tab"
-          aria-selected={activeMobileTab === 'cart'}
-          className={`pos-mobile-tab ${activeMobileTab === 'cart' ? 'pos-mobile-tab--active' : ''}`}
-          onClick={() => setActiveMobileTab('cart')}
+          id="tab-cart"
+          aria-selected={activeTab === 'cart'}
+          className={`pos-mobile-tab ${activeTab === 'cart' ? 'pos-mobile-tab--active' : ''}`}
+          onClick={() => setActiveTab('cart')}
         >
-          🛒 Checkout {cart.length > 0 ? `(${cart.length}) - ₨${grandTotal.toLocaleString()}` : ''}
+          🛒 Checkout {cart.length > 0 ? `(${cart.length}) · ₨${grandTotal.toLocaleString()}` : ''}
+        </button>
+        <button
+          role="tab"
+          id="tab-customer"
+          aria-selected={activeTab === 'customer'}
+          className={`pos-mobile-tab ${activeTab === 'customer' ? 'pos-mobile-tab--active' : ''}`}
+          onClick={() => setActiveTab('customer')}
+        >
+          👤 Customer Details {selectedCustomer ? (selectedCustomer.current_balance_due > 0 ? `(₨${selectedCustomer.current_balance_due.toLocaleString()})` : '✓') : ''}
         </button>
       </div>
 
@@ -502,7 +717,7 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
       {/* ── Main Workspace ── */}
       <div className="pos-workspace">
         {/* ── Left Column: Catalog ── */}
-        <div className={`pos-catalog-panel ${activeMobileTab === 'catalog' ? 'pos-panel--mobile-show' : 'pos-panel--mobile-hide'}`}>
+        <div className={`pos-catalog-panel ${activeTab === 'catalog' ? 'pos-panel--mobile-show' : 'pos-panel--mobile-hide'} ${activeTab === 'customer' ? 'pos-panel--desktop-hide' : ''}`}>
           <div className="pos-catalog-header">
             <h2 className="pos-panel-title">📦 Suit Products Catalog</h2>
             <input
@@ -530,92 +745,61 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
               </button>
             ))}
           </div>
-        </div>
 
-        {/* ── Right Column: Customer Selection, Purchase History & Checkout ── */}
-        <div className={`pos-cart-panel ${activeMobileTab === 'cart' ? 'pos-panel--mobile-show' : 'pos-panel--mobile-hide'}`}>
-          {/* Customer Selection */}
-          <div className="pos-cust-select-wrap">
-            <div className="pos-cust-label-row">
-              <label htmlFor="pos-cust-select" className="pos-label">Wholesale Customer Account *</label>
+          {/* Floating Mobile Checkout Bar */}
+          {activeTab === 'catalog' && cart.length > 0 && (
+            <div className="pos-floating-checkout-bar">
+              <div className="pos-floating-cart-info">
+                🛒 <strong>{cart.reduce((s, i) => s + i.quantity, 0)}</strong> suit{cart.length > 1 ? 's' : ''} in cart · <strong>₨{grandTotal.toLocaleString()}</strong>
+              </div>
               <button
-                id="btn-add-cust-pos"
+                id="btn-floating-checkout"
                 type="button"
-                className="pos-add-cust-btn"
-                onClick={() => setShowAddCustModal(true)}
+                className="pos-floating-checkout-btn"
+                onClick={() => setActiveTab('cart')}
               >
-                + Add Customer
+                Proceed to Checkout →
               </button>
-            </div>
-            <select
-              id="pos-cust-select"
-              className="pos-select"
-              value={selectedCustomerId}
-              onChange={e => setSelectedCustomerId(e.target.value)}
-            >
-              <option value="">— Select Wholesale Customer Account —</option>
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.company_name ? `(${c.company_name})` : ''} — Dues: ₨{c.current_balance_due.toLocaleString()}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Customer Purchase History Drawer (Feature 2) */}
-          {selectedCustomer && (
-            <div className="pos-history-wrap">
-              <button
-                type="button"
-                className="pos-history-toggle"
-                onClick={() => setShowHistoryDrawer(v => !v)}
-              >
-                <span>📜 {selectedCustomer.name}'s Past Bargain & Purchase History</span>
-                <span>{showHistoryDrawer ? '▲ Hide' : `▼ Show (${customerHistory.length})`}</span>
-              </button>
-
-              {showHistoryDrawer && (
-                <div className="pos-history-table-wrap">
-                  {customerHistory.length === 0 ? (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', padding: '0.4rem' }}>
-                      No previous purchases recorded for this customer.
-                    </div>
-                  ) : (
-                    <table className="pos-history-table">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Product</th>
-                          <th>Qty</th>
-                          <th>Charged Rate</th>
-                          <th>Discount %</th>
-                          <th>Invoice #</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {customerHistory.map(r => (
-                          <tr key={r.id}>
-                            <td>{new Date(r.created_at).toLocaleDateString('en-PK', { month: 'short', day: 'numeric' })}</td>
-                            <td><strong>{r.product_name}</strong></td>
-                            <td>{r.quantity}</td>
-                            <td><strong>₨{r.price_charged.toLocaleString()}</strong></td>
-                            <td>
-                              {r.discount_percent > 0 ? (
-                                <span className="pos-disc-badge">{r.discount_percent}% OFF</span>
-                              ) : (
-                                <span style={{ color: '#64748b' }}>0%</span>
-                              )}
-                            </td>
-                            <td>#{r.invoice_no}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
             </div>
           )}
+        </div>
+
+        {/* ── Right Column: Counter & Checkout (Clean, Fast, Uncluttered) ── */}
+        <div className={`pos-cart-panel ${activeTab === 'cart' ? 'pos-panel--mobile-show' : 'pos-panel--mobile-hide'} ${activeTab === 'customer' ? 'pos-panel--desktop-hide' : ''}`}>
+          {/* Customer Context Chip */}
+          <div className="pos-cart-customer-chip">
+            {selectedCustomer ? (
+              <div className="pos-ccc-row">
+                <div className="pos-ccc-info">
+                  <span className="pos-ccc-badge">👤 <strong>{selectedCustomer.name}</strong></span>
+                  {selectedCustomer.company_name && <span className="pos-ccc-shop">({selectedCustomer.company_name})</span>}
+                  <span className={`pos-ccc-dues ${selectedCustomer.current_balance_due > 0 ? 'pos-ccc-dues--pending' : 'pos-ccc-dues--ok'}`}>
+                    {selectedCustomer.current_balance_due > 0 ? `Prior Dues: ₨${selectedCustomer.current_balance_due.toLocaleString()}` : '✓ No Dues'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="btn-cart-view-ledger"
+                  className="pos-ccc-link-btn"
+                  onClick={() => setActiveTab('customer')}
+                >
+                  View Details & History →
+                </button>
+              </div>
+            ) : (
+              <div className="pos-ccc-row pos-ccc-row--alert">
+                <span>⚠️ No wholesale customer selected.</span>
+                <button
+                  type="button"
+                  id="btn-cart-select-customer"
+                  className="pos-ccc-link-btn pos-ccc-link-btn--select"
+                  onClick={() => setActiveTab('customer')}
+                >
+                  Select Customer →
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Cart Table with Price Override & Live Discount % Display (Feature 2) */}
           <div className="pos-cart-table-wrap">
@@ -769,6 +953,227 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
             </button>
           </form>
         </div>
+
+        {/* ── Separate Dedicated Customer Panel (Details, Financials, Installment Schedule & Receipts) ── */}
+        <div className={`pos-customer-panel ${activeTab === 'customer' ? 'pos-customer-panel--active' : 'pos-customer-panel--hidden'}`}>
+          <div className="pos-customer-panel-header">
+            <div className="pos-cpp-title-row">
+              <div>
+                <h2 className="pos-panel-title">👤 Customer Ledger & Financial Profile</h2>
+                <div className="pos-panel-subtext">Past bargain rates, dues, installment schedules, and receipt history</div>
+              </div>
+              <button
+                type="button"
+                id="btn-customer-return-counter"
+                className="pos-panel-back-btn"
+                onClick={() => setActiveTab(cart.length > 0 ? 'cart' : 'catalog')}
+              >
+                ← Return to Counter {cart.length > 0 ? `(${cart.length} items in cart)` : ''}
+              </button>
+            </div>
+          </div>
+
+          {/* Customer Selection Card inside Panel */}
+          <div className="pos-cpp-select-card">
+            <div className="pos-cust-label-row">
+              <label htmlFor="pos-cust-select-main" className="pos-label">Selected Customer Account</label>
+              <button
+                id="btn-add-cust-from-panel"
+                type="button"
+                className="pos-add-cust-btn"
+                onClick={() => setShowAddCustModal(true)}
+              >
+                + Add New Customer
+              </button>
+            </div>
+            <select
+              id="pos-cust-select-main"
+              className="pos-select"
+              value={selectedCustomerId}
+              onChange={e => setSelectedCustomerId(e.target.value)}
+            >
+              <option value="">— Choose a Wholesale Customer —</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.company_name ? `(${c.company_name})` : ''} — Dues: ₨{c.current_balance_due.toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedCustomer ? (
+            <div className="pos-cpp-body">
+              {/* Profile & Financial Summary Cards */}
+              <div className="pos-cpp-stats-grid">
+                <div className="pos-cpp-stat-card">
+                  <div className="pos-cpp-stat-label">CUSTOMER NAME</div>
+                  <div className="pos-cpp-stat-val">{selectedCustomer.name}</div>
+                  <div className="pos-cpp-stat-sub">{selectedCustomer.company_name || 'Individual Customer'}</div>
+                </div>
+
+                <div className="pos-cpp-stat-card">
+                  <div className="pos-cpp-stat-label">PHONE & CONTACT</div>
+                  <div className="pos-cpp-stat-val">{selectedCustomer.phone || 'No phone recorded'}</div>
+                  <div className="pos-cpp-stat-sub">{selectedCustomer.city || 'Wholesale Market'}</div>
+                </div>
+
+                <div className={`pos-cpp-stat-card ${selectedCustomer.current_balance_due > 0 ? 'pos-cpp-stat-card--danger' : 'pos-cpp-stat-card--success'}`}>
+                  <div className="pos-cpp-stat-label">TOTAL BALANCE DUE</div>
+                  <div className="pos-cpp-stat-val">₨{selectedCustomer.current_balance_due.toLocaleString()}</div>
+                  <div className="pos-cpp-stat-sub">
+                    {selectedCustomer.credit_limit > 0 ? `Credit Limit: ₨${selectedCustomer.credit_limit.toLocaleString()}` : 'No credit limit set'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Receive Payment Quick Banner */}
+              {selectedCustomer.current_balance_due > 0 && (
+                <div className="pos-cpp-payment-banner">
+                  <div>
+                    <strong>Outstanding Balance: ₨{selectedCustomer.current_balance_due.toLocaleString()}</strong>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>Record cash, bank transfer, or cheque payments against customer dues</div>
+                  </div>
+                  <button
+                    type="button"
+                    id="btn-panel-receive-payment"
+                    className="pos-cpp-receive-btn"
+                    onClick={() => setShowPaymentModal(true)}
+                  >
+                    💵 Receive Payment
+                  </button>
+                </div>
+              )}
+
+              {/* Past Bargain & Purchase Rates History */}
+              <div className="pos-cpp-section">
+                <div className="pos-cpp-section-header">
+                  <h3 className="pos-cpp-section-title">🏷️ Past Bargain & Purchase Rates ({customerHistory.length})</h3>
+                  <span className="pos-cpp-section-note">Last prices charged to this customer</span>
+                </div>
+                {customerHistory.length === 0 ? (
+                  <div className="pos-cpp-empty-note">
+                    No past purchases recorded for this customer.
+                  </div>
+                ) : (
+                  <div className="pos-history-table-wrap">
+                    <table className="pos-history-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Product</th>
+                          <th>Qty</th>
+                          <th>Charged Rate</th>
+                          <th>Discount</th>
+                          <th>Invoice #</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customerHistory.map(r => (
+                          <tr key={r.id}>
+                            <td>{new Date(r.created_at).toLocaleDateString('en-PK', { month: 'short', day: 'numeric' })}</td>
+                            <td><strong>{r.product_name}</strong></td>
+                            <td>{r.quantity}</td>
+                            <td><strong>₨{r.price_charged.toLocaleString()}</strong></td>
+                            <td>
+                              {r.discount_percent > 0 ? (
+                                <span className="pos-disc-badge">{r.discount_percent}% OFF</span>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>0%</span>
+                              )}
+                            </td>
+                            <td>#{r.invoice_no}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Installment Plan Schedule */}
+              <div className="pos-cpp-section">
+                <div className="pos-cpp-section-header">
+                  <h3 className="pos-cpp-section-title">📅 Installment Plan Schedule ({paymentPlans.length})</h3>
+                  <span className="pos-cpp-section-note">Payment schedule & bank clearing status</span>
+                </div>
+                {paymentPlans.length === 0 ? (
+                  <div className="pos-cpp-empty-note">
+                    No planned installments active. New sales on credit can establish settlement schedules.
+                  </div>
+                ) : (
+                  <div className="pos-cpp-plans-list">
+                    {paymentPlans.map(plan => {
+                      const isPendingCheque = plan.payment_method === 'cheque' && plan.status !== 'received';
+                      return (
+                        <div key={plan.id} className="pos-cpp-plan-card">
+                          <div className="pos-cpp-plan-main">
+                            <div className="pos-cpp-plan-title">
+                              Installment #{plan.installment_no} of {plan.total_installments}
+                              <span className={`pos-cpp-plan-badge pos-cpp-plan-badge--${plan.status}`}>
+                                {plan.status.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="pos-cpp-plan-details">
+                              <span>Due: <strong>{plan.due_date}</strong></span>
+                              <span>Method: <strong>{plan.payment_method}</strong></span>
+                              {plan.cheque_no && <span>Cheque #{plan.cheque_no}</span>}
+                              {plan.cheque_clearing_date && <span>Clear Date: {plan.cheque_clearing_date}</span>}
+                            </div>
+                          </div>
+                          <div className="pos-cpp-plan-amounts">
+                            <div className="pos-cpp-plan-sum">
+                              ₨{Number(plan.amount_paid).toLocaleString()} / <strong>₨{Number(plan.amount_due).toLocaleString()}</strong>
+                            </div>
+                            {isPendingCheque && (
+                              <button
+                                type="button"
+                                className="pos-cpp-cheque-btn"
+                                onClick={() => handleConfirmChequeClearance(plan)}
+                              >
+                                ✓ Confirm Bank Clearance
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Complete Persistent Receipt History */}
+              <div className="pos-cpp-section">
+                <div className="pos-cpp-section-header">
+                  <h3 className="pos-cpp-section-title">📜 Receipts & Invoices ({receipts.length})</h3>
+                  <span className="pos-cpp-section-note">View, re-print, share, or audit-correct past receipts</span>
+                </div>
+                <ReceiptHistory
+                  receipts={receipts}
+                  onView={setViewReceipt}
+                  onShare={setViewReceipt}
+                  onEdit={handleCorrectReceipt}
+                  userRole={profile?.role || 'shop_staff'}
+                  customers={customers}
+                  catalogProducts={catalogProducts}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="pos-cpp-no-customer">
+              <div className="pos-cpp-no-cust-icon">👤</div>
+              <h3>No Customer Selected</h3>
+              <p>Select an existing customer from the dropdown above or click "+ Add New Customer" to view their balance, installment schedule, and receipt history.</p>
+              <button
+                type="button"
+                className="pos-checkout-btn"
+                style={{ maxWidth: '280px', margin: '1rem auto 0' }}
+                onClick={() => setShowAddCustModal(true)}
+              >
+                + Add Customer
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Invoice Print Modal */}
@@ -777,6 +1182,24 @@ export function PosCounter({ user, branding, onSignOut }: PosCounterProps) {
           sale={lastSale}
           branding={branding}
           onClose={() => setShowPrintModal(false)}
+        />
+      )}
+
+      {viewReceipt && (
+        <InvoicePrintModal
+          sale={viewReceipt.snapshot}
+          branding={branding}
+          onClose={() => setViewReceipt(null)}
+        />
+      )}
+
+      {showPaymentModal && selectedCustomer && (
+        <ReceivePaymentModal
+          customerName={selectedCustomer.name}
+          balance={selectedCustomer.current_balance_due}
+          plans={paymentPlans}
+          onClose={() => setShowPaymentModal(false)}
+          onSave={handleReceivePayment}
         />
       )}
 

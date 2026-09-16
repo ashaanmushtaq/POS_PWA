@@ -13,6 +13,7 @@ export function App() {
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [user, setUser] = useState<User | null>(null);
   const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const [profile, setProfile] = useState<import('./lib/auth').PosUserProfile | null>(null);
   const [tenantReady, setTenantReady] = useState(false);
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export function App() {
         setTenantReady(false);
         setUser(null);
         setBranding(null);
+        setProfile(null);
         setAuthState('unauthenticated');
         return;
       }
@@ -31,15 +33,17 @@ export function App() {
       setTenantReady(false);
       setUser(null);
       setBranding(null);
+      setProfile(null);
       void clearLocalData().then(async () => {
-        const profile = await getPosProfile(u);
-        if (!profile) {
+        const p = await getPosProfile(u);
+        if (!p) {
           setAuthState('unauthenticated');
           return;
         }
-        const b = await getTenantBranding(profile.tenant_id);
+        const b = await getTenantBranding(p.tenant_id);
         setBranding(b);
-        setActiveTenantId(profile.tenant_id);
+        setProfile(p);
+        setActiveTenantId(p.tenant_id);
         setUser(u);
         setTenantReady(true);
         setAuthState('authenticated');
@@ -64,7 +68,7 @@ export function App() {
     return <PosLoginPage onSuccess={() => setAuthState('authenticated')} />;
   }
 
-  return <PosCounter user={user} branding={branding} onSignOut={handleSignOut} />;
+  return <PosCounter user={user} branding={branding} profile={profile} onSignOut={handleSignOut} />;
 }
 
 function PosSplash() {

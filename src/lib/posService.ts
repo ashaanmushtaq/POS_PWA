@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import {
   enqueueOfflineSale, getPendingQueue, removeQueueItem,
   setLocalCache, getLocalCache, type OfflineSalePayload,
+  getActiveTenantId,
 } from './offlineQueue';
 
 export interface PosCustomer {
@@ -69,6 +70,20 @@ export interface CustomerPaymentPlan {
   notes?: string;
   created_at?: string;
 }
+
+export interface PosReceipt {
+  id: string;
+  customer_id: string;
+  sale_id: string | null;
+  payment_id: string | null;
+  invoice_no: string;
+  receipt_type: 'sale' | 'payment';
+  snapshot: OfflineSalePayload;
+  version: number;
+  edited_at: string | null;
+  created_at: string;
+}
+
 
 export const DEFAULT_SUIT_CATALOG: PosProductItem[] = [
   { id: 'suit-2pc-standard', name: 'Standard 2-Piece Wash & Wear Suit', suit_type: '2-Piece Suit', default_price: 3500, size_category: 'adult', size_code: 'L', color: 'Navy Blue', fabric_type: 'washing_wear', stock_quantity: 45, barcode: '8901001', is_active: true },
@@ -353,7 +368,7 @@ export async function fetchCustomerPurchaseHistory(customerId: string): Promise<
   return cached || [];
 }
 
-export async function recordCustomerProductPriceHistory(payload: OfflineSalePayload): Promise<void> {
+export async function recordCustomerProductPriceHistory(payload: OfflineSalePayload, saleId?: string): Promise<void> {
   const records: CustomerPriceHistoryRecord[] = payload.items.map(item => {
     const basePrice = item.base_price ?? item.unit_price;
     const discountPct = item.discount_percent ?? (basePrice > 0 ? Number((((basePrice - item.unit_price) / basePrice) * 100).toFixed(1)) : 0);
@@ -384,6 +399,7 @@ export async function recordCustomerProductPriceHistory(payload: OfflineSalePayl
       discount_percent: r.discount_percent,
       quantity: r.quantity,
       invoice_no: r.invoice_no,
+      sale_id: saleId ?? null,
       created_at: r.created_at,
     }));
 
@@ -449,6 +465,263 @@ export async function fetchCustomerPaymentPlans(customerId?: string, saleId?: st
   return [];
 }
 
+export interface PosReceiptCorrection {
+  id: string;
+  receipt_id: string;
+  sale_id: string | null;
+  changed_by: string | null;
+  changed_by_name?: string;
+  reason?: string | null;
+  before_snapshot: OfflineSalePayload;
+  after_snapshot: OfflineSalePayload;
+  changed_at: string;
+}
+
+export interface ReceivePaymentPayload {
+  customer_id: string;
+  amount: number;
+  payment_method: CustomerPaymentPlan['payment_method'];
+  sale_id?: string;
+  reference_no?: string;
+  payment_date?: string;
+  cheque_clearing_date?: string;
+  plan_ids?: string[];
+  notes?: string;
+  is_cleared?: boolean;
+}
+
+export async function fetchCustomerReceipts(customerId: string): Promise<PosReceipt[]> {
+  if (!navigator.onLine || !customerId) return [];
+  const { data, error } = await supabase
+    .from('pos_receipts')
+    .select('id, customer_id, sale_id, payment_id, invoice_no, receipt_type, snapshot, version, edited_at, created_at')
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Receipt history error: ${error.message}`);
+  return (data || []) as PosReceipt[];
+}
+
+export async function fetchAllPosReceipts(params?: {
+  searchQuery?: string;
+  startDate?: string;
+  endDate?: string;
+  receiptType?: 'all' | 'sale' | 'payment';
+  customerId?: string;
+  limit?: number;
+}): Promise<PosReceipt[]> {
+  if (!navigator.onLine) {
+    const cached = await getLocalCache<PosReceipt[]>('pos_all_receipts');
+    let list = cached || [];
+    if (params?.customerId) list = list.filter(r => r.customer_id === params.customerId);
+    if (params?.receiptType && params.receiptType !== 'all') list = list.filter(r => r.receipt_type === params.receiptType);
+    if (params?.searchQuery) {
+      const q = params.searchQuery.toLowerCase();
+      list = list.filter(r => r.invoice_no.toLowerCase().includes(q) || (r.snapshot.customer_name || '').toLowerCase().includes(q));
+    }
+    return list;
+  }
+
+  let query = supabase
+    .from('pos_receipts')
+    .select('id, customer_id, sale_id, payment_id, invoice_no, receipt_type, snapshot, version, edited_at, created_at, customers:customer_id(name, company_name, phone)')
+    .order('created_at', { ascending: false });
+
+  if (params?.customerId) {
+    query = query.eq('customer_id', params.customerId);
+  }
+  if (params?.receiptType && params.receiptType !== 'all') {
+    query = query.eq('receipt_type', params.receiptType);
+  }
+  if (params?.startDate) {
+    query = query.gte('created_at', `${params.startDate}T00:00:00.000Z`);
+  }
+  if (params?.endDate) {
+    query = query.lte('created_at', `${params.endDate}T23:59:59.999Z`);
+  }
+  query = query.limit(params?.limit || 150);
+
+  const { data, error } = await query;
+  if (error) {
+    console.warn('fetchAllPosReceipts query notice:', error.message);
+    const cached = await getLocalCache<PosReceipt[]>('pos_all_receipts');
+    return cached || [];
+  }
+
+  let results: PosReceipt[] = (data || []).map((r: any) => ({
+    id: r.id,
+    customer_id: r.customer_id,
+    customer_name: r.customers?.name || r.snapshot?.customer_name,
+    sale_id: r.sale_id,
+    payment_id: r.payment_id,
+    invoice_no: r.invoice_no,
+    receipt_type: r.receipt_type,
+    snapshot: r.snapshot,
+    version: r.version,
+    edited_at: r.edited_at,
+    created_at: r.created_at,
+  }));
+
+  if (params?.searchQuery) {
+    const q = params.searchQuery.toLowerCase().trim();
+    results = results.filter(r =>
+      r.invoice_no.toLowerCase().includes(q) ||
+      (r.customer_name || '').toLowerCase().includes(q) ||
+      (r.snapshot?.customer_name || '').toLowerCase().includes(q) ||
+      (r.snapshot?.customer_phone || '').includes(q)
+    );
+  }
+
+  if (!params?.customerId && !params?.searchQuery && !params?.startDate) {
+    await setLocalCache('pos_all_receipts', results);
+  }
+
+  return results;
+}
+
+export async function fetchReceiptCorrections(receiptId: string): Promise<PosReceiptCorrection[]> {
+  if (!navigator.onLine || !receiptId) return [];
+  const { data, error } = await supabase
+    .from('pos_receipt_corrections')
+    .select('id, receipt_id, sale_id, changed_by, reason, before_snapshot, after_snapshot, changed_at, profiles:changed_by(full_name)')
+    .eq('receipt_id', receiptId)
+    .order('changed_at', { ascending: false });
+
+  if (error) {
+    console.warn('fetchReceiptCorrections notice:', error.message);
+    return [];
+  }
+
+  return (data || []).map((c: any) => ({
+    id: c.id,
+    receipt_id: c.receipt_id,
+    sale_id: c.sale_id,
+    changed_by: c.changed_by,
+    changed_by_name: c.profiles?.full_name || 'Owner / Authorized Staff',
+    reason: c.reason,
+    before_snapshot: c.before_snapshot,
+    after_snapshot: c.after_snapshot,
+    changed_at: c.changed_at,
+  }));
+}
+
+export async function receiveCustomerPayment(payload: ReceivePaymentPayload): Promise<{ paymentId?: string; planId?: string; isPendingCheque?: boolean }> {
+  // If method is cheque and not yet cleared:
+  if (payload.payment_method === 'cheque' && payload.is_cleared === false) {
+    if (payload.plan_ids && payload.plan_ids.length > 0) {
+      const planId = payload.plan_ids[0];
+      const { error } = await supabase
+        .from('customer_payment_plans')
+        .update({
+          cheque_no: payload.reference_no ?? undefined,
+          cheque_clearing_date: payload.cheque_clearing_date ?? undefined,
+          notes: payload.notes ? `${payload.notes} (Cheque collected at counter, pending bank clearance)` : 'Cheque collected at counter, pending bank clearance',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', planId);
+      if (error) throw new Error(`Failed to update cheque installment: ${error.message}`);
+      return { planId, isPendingCheque: true };
+    } else {
+      const { data, error } = await supabase
+        .from('customer_payment_plans')
+        .insert({
+          customer_id: payload.customer_id,
+          invoice_no: `CHQ-${Date.now().toString().slice(-6)}`,
+          installment_no: 1,
+          total_installments: 1,
+          amount_due: payload.amount,
+          amount_paid: 0,
+          due_date: payload.cheque_clearing_date || new Date().toISOString().slice(0, 10),
+          payment_method: 'cheque',
+          cheque_no: payload.reference_no ?? null,
+          cheque_clearing_date: payload.cheque_clearing_date ?? null,
+          status: 'planned',
+          notes: payload.notes || 'Counter cheque collected, awaiting clearing',
+        })
+        .select('id')
+        .single();
+      if (error) throw new Error(`Failed to register pending cheque: ${error.message}`);
+      return { planId: data.id, isPendingCheque: true };
+    }
+  }
+
+  const { data, error } = await supabase.rpc('receive_pos_payment', {
+    p_customer_id: payload.customer_id,
+    p_amount: payload.amount,
+    p_method: payload.payment_method,
+    p_sale_id: payload.sale_id ?? null,
+    p_reference_no: payload.reference_no ?? null,
+    p_payment_date: payload.payment_date ?? new Date().toISOString().slice(0, 10),
+    p_notes: payload.notes ?? 'POS payment collection',
+    p_plan_ids: payload.plan_ids ?? [],
+  });
+  if (error) throw new Error(`Payment collection failed: ${error.message}`);
+  return { paymentId: data as string, isPendingCheque: false };
+}
+
+export async function confirmChequeClearance(
+  planId: string,
+  clearanceDate?: string,
+  notes?: string
+): Promise<string> {
+  const { data, error } = await supabase.rpc('confirm_cheque_clearance', {
+    p_plan_id: planId,
+    p_clearance_date: clearanceDate || new Date().toISOString().slice(0, 10),
+    p_notes: notes ?? null,
+  });
+  if (error) throw new Error(`Cheque clearance confirmation failed: ${error.message}`);
+  return data as string;
+}
+
+export async function savePosReceipt(
+  sale: OfflineSalePayload,
+  saleId: string | null,
+  paymentId?: string | null,
+  receiptType: 'sale' | 'payment' = 'sale',
+): Promise<PosReceipt | null> {
+  if (!navigator.onLine) {
+    await setLocalCache(`pos_receipt_${sale.invoice_no}`, sale);
+    return null;
+  }
+  const payload: Record<string, unknown> = {
+    customer_id: sale.customer_id,
+    sale_id: saleId,
+    payment_id: paymentId ?? null,
+    invoice_no: sale.invoice_no,
+    receipt_type: receiptType,
+    snapshot: sale,
+  };
+  const activeTenant = getActiveTenantId() || sale.tenant_id;
+  if (activeTenant) {
+    payload.tenant_id = activeTenant;
+  }
+  const { data, error } = await supabase
+    .from('pos_receipts')
+    .insert(payload)
+    .select('id, customer_id, sale_id, payment_id, invoice_no, receipt_type, snapshot, version, edited_at, created_at')
+    .single();
+  if (error) throw new Error(`Receipt save failed: ${error.message}`);
+  return data as PosReceipt;
+}
+
+export async function correctPosReceipt(
+  receipt: PosReceipt,
+  snapshot: OfflineSalePayload,
+  reason?: string
+): Promise<PosReceipt> {
+  const { data, error } = await supabase.rpc('correct_pos_sale', {
+    p_receipt_id: receipt.id,
+    p_total_amount: snapshot.total_amount,
+    p_snapshot: snapshot,
+    p_reason: reason || 'Corrected in POS Counter',
+  });
+  if (error) throw new Error(`Receipt correction failed: ${error.message}`);
+  if (receipt.sale_id) {
+    await supabase.from('customer_product_price_history').delete().eq('sale_id', receipt.sale_id);
+    await recordCustomerProductPriceHistory(snapshot, receipt.sale_id);
+  }
+  return data as PosReceipt;
+}
+
 export async function markPaymentPlanAsReceived(
   planId: string,
   amountReceived: number,
@@ -503,6 +776,7 @@ export async function processPosCheckout(
   success: boolean;
   isOffline: boolean;
   serverInvoiceNo?: string;
+  saleId?: string;
   message: string;
 }> {
   const offlinePayload: OfflineSalePayload = {
@@ -545,7 +819,7 @@ export async function processPosCheckout(
       }
 
       // 3. Record Price History directly to Supabase as Source of Truth
-      await recordCustomerProductPriceHistory(payload);
+      await recordCustomerProductPriceHistory(payload, saleId);
 
       // 4. Record Settlement Plans / Installment Schedule if present
       if (settlementPlans && settlementPlans.length > 0) {
@@ -553,10 +827,21 @@ export async function processPosCheckout(
         await recordCustomerPaymentPlans(plansWithSaleId);
       }
 
+      await savePosReceipt({ ...payload, installment_plans: settlementPlans?.map(plan => ({
+        installment_no: plan.installment_no,
+        total_installments: plan.total_installments,
+        amount_due: plan.amount_due,
+        due_date: plan.due_date,
+        payment_method: plan.payment_method,
+        status: plan.status,
+        notes: plan.notes,
+      })) }, saleId);
+
       return {
         success: true,
         isOffline: false,
         serverInvoiceNo: payload.invoice_no,
+        saleId,
         message: `✓ Order #${payload.invoice_no} recorded live on Supabase across all devices!`,
       };
     } catch (err: unknown) {
